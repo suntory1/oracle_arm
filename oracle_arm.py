@@ -7,6 +7,11 @@ import sys
 import requests
 import random
 import base64
+import hashlib
+import hmac
+import json
+import time
+import urllib.parse
 
 USE_PUSH = False  # 如果启用推送 要设置为True
 
