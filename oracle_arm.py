@@ -7,23 +7,68 @@ import sys
 import requests
 import random
 import base64
+
+USE_PUSH = False  # 如果启用推送 要设置为True
+
 # tg pusher config
-USE_TG = False  # 如果启用tg推送 要设置为True
 TG_BOT_TOKEN = ''  # 通过 @BotFather 申请获得，示例：1077xxx4424:AAFjv0FcqxxxxxxgEMGfi22B4yh15R5uw
 TG_USER_ID = ''  # 用户、群组或频道 ID，示例：129xxx206
 TG_API_HOST = 'api.telegram.org'  # 自建 API 反代地址，供网络环境无法访问时使用，网络正常则保持默认
 
+# Lark push config
+LARK_BOT_KEY = ''
+LARK_BOT_SECRET = ''
+
+def message2Lark(desp):
+    if LARK_BOT_KEY:
+        data = {
+            "msg_type": "interactive",
+            "card": {
+                "config": {
+                    "wide_screen_mode": True
+                },
+                "header": {
+                    "title": {
+                        "tag": "plain_text",
+                        "content": "甲骨文ARM抢注"
+                    },
+                    "template": "purple"
+                },
+                "elements": [{
+                        "tag": "div",
+                        "text": {
+                            "tag": "lark_md",
+                            "content": desp
+                        }
+                    }
+                ]
+            }
+        }
+
+        if LARK_BOT_SECRET:
+            timestamp = str(round(time.time()))
+            string_to_sign = '{}\n{}'.format(timestamp, LARK_BOT_SECRET)
+            hmac_code = hmac.new(string_to_sign.encode("utf-8"), digestmod=hashlib.sha256).digest()
+            sign = base64.b64encode(hmac_code).decode('utf-8')
+            data["timestamp"] = timestamp
+            data["sign"] = sign
+
+        requests.post(url=f"https://open.feishu.cn/open-apis/bot/v2/hook/{LARK_BOT_KEY}", json=data)
 
 def telegram(desp):
-    data = (('chat_id', TG_USER_ID), ('text', '🐢甲骨文ARM抢注脚本为您播报🐢 \n\n' + desp))
-    response = requests.post('https://' + TG_API_HOST + '/bot' + TG_BOT_TOKEN +
-                             '/sendMessage',
-                             data=data)
-    if response.status_code != 200:
-        print('Telegram Bot 推送失败')
-    else:
-        print('Telegram Bot 推送成功')
+    if TG_BOT_TOKEN and TG_USER_ID:
+        data = (('chat_id', TG_USER_ID), ('text', '🐢甲骨文ARM抢注脚本为您播报🐢 \n\n' + desp))
+        response = requests.post('https://' + TG_API_HOST + '/bot' + TG_BOT_TOKEN +
+                                '/sendMessage',
+                                data=data)
+        if response.status_code != 200:
+            print('Telegram Bot 推送失败')
+        else:
+            print('Telegram Bot 推送成功')
 
+def sendMessage(desp):
+    telegram(desp)
+    message2Lark(desp)
 
 class OciUser:
     """
@@ -220,10 +265,10 @@ class InsCreate:
     def create(self):
         # print("与运行创建活动")
         # 开启一个tg的原始推送
-        text = "脚本开始启动:\n,区域:{}-实例:{},CPU:{}C-内存:{}G-硬盘:{}G的小🐔已经快马加鞭抢购了\n".format(
+        text = "【脚本开始启动】\n区域:{}\n实例:{}\n{}C{}G{}G的小🐔已经快马加鞭抢购了\n".format(
             self.tf.availability_domain, self.tf.display_name, self.tf.ocpus,
             self.tf.memory_in_gbs, self.tf.boot_volume_size_in_gbs)
-        telegram(text)
+        sendMessage(text)
         self.gen_pwd()
         while True:
             try:
@@ -239,10 +284,10 @@ class InsCreate:
                     if "Service limit" in e.message and e.status==400:
 
                         # 可能是别的错误，也有可能是 达到上限了，要去查看一下是否开通成功，也有可能错误了
-                        self.logp("❌如果看到这条推送,说明刷到机器，但是开通失败了，请后台检查你的cpu，内存，硬盘占用情况，并释放对应的资源 返回值:{},\n 脚本停止".format(e))
+                        self.logp("如果看到这条推送,说明刷到机器，但是开通失败了，请后台检查你的cpu，内存，硬盘占用情况，并释放对应的资源 返回值:{},\n 脚本停止".format(e))
                     else:
-                        self.logp("❌发生错误,脚本停止!请检查参数或github反馈/查找 相关问题:{}".format(e))
-                    telegram(self.desp)
+                        self.logp("发生错误,脚本停止!请检查参数或github反馈/查找 相关问题:{}".format(e))
+                    sendMessage(self.desp)
                     raise e
                 else:
                     # 没有被限速，恢复减少的时间
@@ -267,7 +312,7 @@ class InsCreate:
                 self.logp("ssh登陆密码: {} \n".format(self._pwd))
                 self.check_public_ip()
 
-                telegram(self.desp)
+                sendMessage(self.desp)
                 break
             finally:
                 self.try_count += 1
@@ -316,7 +361,7 @@ class InsCreate:
 
     def logp(self, text):
         print(text)
-        if USE_TG:
+        if USE_PUSH:
             self.desp += text
 
 
