@@ -13,6 +13,10 @@ TG_BOT_TOKEN = ''  # 通过 @BotFather 申请获得，示例：1077xxx4424:AAFjv
 TG_USER_ID = ''  # 用户、群组或频道 ID，示例：129xxx206
 TG_API_HOST = 'api.telegram.org'  # 自建 API 反代地址，供网络环境无法访问时使用，网络正常则保持默认
 
+CFG_SLEEP_TIME_DEFAULT = 10
+CFG_SLEEP_TIME_MIN_THREASHOLD = 20
+CFG_SLEEP_TIME_MAX_THREASHOLD = 60
+CFG_SLEEP_TIME_STEP = 10
 
 def telegram(desp):
     data = (('chat_id', TG_USER_ID), ('text', '🐢甲骨文ARM抢注脚本为您播报🐢 \n\n' + desp))
@@ -196,7 +200,7 @@ class FileParser:
 
 class InsCreate:
     shape = 'VM.Standard.A1.Flex'
-    sleep_time = 5.0
+    sleep_time = CFG_SLEEP_TIME_DEFAULT
     try_count = 0
     desp = ""
 
@@ -231,9 +235,9 @@ class InsCreate:
             except oci.exceptions.ServiceError as e:
                 if e.status == 429 and e.code == 'TooManyRequests' and e.message == 'Too many requests for the user':
                     # 被限速了，改一下时间
-                    print("请求太快了，自动调整请求时间ing")
-                    if self.sleep_time < 60:
-                        self.sleep_time += 10
+                    if self.sleep_time < CFG_SLEEP_TIME_MAX_THREASHOLD:
+                        self.sleep_time += CFG_SLEEP_TIME_STEP
+                    print(f"请求太快了，自动调整请求时间到{self.sleep_time}")
                 elif not (e.status == 500 and e.code == 'InternalError'
                           and e.message == 'Out of host capacity.'):
                     if "Service limit" in e.message and e.status==400:
@@ -246,9 +250,9 @@ class InsCreate:
                     raise e
                 else:
                     # 没有被限速，恢复减少的时间
-                    print("目前没有请求限速,快马加刷中")
-                    if self.sleep_time > 15:
-                        self.sleep_time -= 10
+                    if self.sleep_time >= CFG_SLEEP_TIME_MIN_THREASHOLD:
+                        self.sleep_time -= CFG_SLEEP_TIME_STEP
+                    print(f"目前没有请求限速,快马加刷中，请求时间为 {self.sleep_time}")
                 print("本次返回信息:",e)
                 time.sleep(self.sleep_time)
             else:
